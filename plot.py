@@ -15,16 +15,12 @@ import os
 os.makedirs('figures', exist_ok=True)
 
 all_models = [
-    ('Alpaca', '7B'),
-    ('LLaMa', '7B'),
-    ('LLaMa', '13B'),
-    ('LLaMa', '30B'),
-    ('LLaMa', '65B'),
-]
-
-
-all_models = [
-    ('gpt2', 'tiny'),
+    'Alpaca-7B',
+    'LLaMa-7B',
+    'LLaMa-13B',
+    'LLaMa-30B',
+    'LLaMa-65B',
+    'bert-tiny-uncased',
 ]
 
 all_prompt_nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -146,10 +142,10 @@ def get_numbers_prob_map(sentences):
     return np.array([first_char_counts.get(c, 0) / len(sentences) for c in '0123456789'])
 
 class Plotter:
-    def __init__(self, configuration):
+    def __init__(self, configuration, models=None):
         self.dataset_name = configuration['name']
         self.dataset_formatted_name = configuration['format']
-        self.models = configuration['models']
+        self.models = models or configuration['models']
         self.ylim = configuration['ylim']
         self.yticks = configuration['yticks']
         self.prompt_nums = configuration['prompt_nums']
@@ -158,7 +154,7 @@ class Plotter:
 
 
         # get the baseline real data
-        with open(f'data/{self.dataset_name}/oneshot/prompt-{self.prompt_nums[0]}/{self.models[0][0].lower()}-{self.models[0][1]}/trial-0/pcfg-logprobs.pkl', 'rb') as f:
+        with open(f'data/{self.dataset_name}/oneshot/prompt-{self.prompt_nums[0]}/{self.models[0].lower()}/trial-0/pcfg-logprobs.pkl', 'rb') as f:
             (true, _) = pickle.load(f)
             real_logprobs = np.array([x[1] for x in true])
             real_probs = np.exp(real_logprobs)
@@ -238,7 +234,7 @@ class Plotter:
             self.uniform_distance = self.autoregressive_baseline_distance
             self.uniform_cross = self.autoregressive_baseline_cross
 
-    def read_oneshot(self, model_arch, model_size, plot_per_trial):
+    def read_oneshot(self, model_name, plot_per_trial):
         y_gt = []
         y_gt_errs = []
         y_cross = []
@@ -253,7 +249,7 @@ class Plotter:
             merrs = []
 
             for trial in range(10):
-                with open(f'data/{self.dataset_name}/oneshot/prompt-{pnum}/{model_arch.lower()}-{model_size}/trial-{trial}/pcfg-logprobs.pkl', 'rb') as f:
+                with open(f'data/{self.dataset_name}/oneshot/prompt-{pnum}/{model_name.lower()}/trial-{trial}/pcfg-logprobs.pkl', 'rb') as f:
                     (_, pred_logprobs) = pickle.load(f)
                     pred_logprobs = np.array(pred_logprobs)
                     pred_probs = np.exp(pred_logprobs)
@@ -282,7 +278,7 @@ class Plotter:
                 plural = 's' if pnum != 1 else ''
                 if 'numbers' in self.dataset_name:
                     m_ax.bar(np.linspace(.05, .95, 10), pred_probs, width=0.08)
-                    m_ax.set_title(f'{model_arch}-{model_size}, {pnum} Example{plural}, NARS')
+                    m_ax.set_title(f'{model_name}, {pnum} Example{plural}, NARS')
                     m_ax.set_xlabel('Generated Number')
                     m_ax.set_ylabel('Sampling Prob.')
                     m_ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
@@ -296,11 +292,11 @@ class Plotter:
                     format_axes(m_ax)
 
                     m_fig.tight_layout()
-                    m_fig.savefig(f'figures/unified-{self.dataset_name}-oneshot-{model_arch}-{model_size}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
+                    m_fig.savefig(f'figures/unified-{self.dataset_name}-oneshot-{model_name}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
                     plt.close(m_fig)
                 elif 'bits' in self.dataset_name:
                     m_ax.bar([0, 1], pred_probs, width=0.8)
-                    m_ax.set_title(f'{model_arch}-{model_size}, {pnum} Example{plural}, NARS')
+                    m_ax.set_title(f'{model_name}, {pnum} Example{plural}, NARS')
                     m_ax.set_xlabel('Generated Bit')
                     m_ax.set_ylabel('Sampling Prob.')
                     m_ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
@@ -313,7 +309,7 @@ class Plotter:
                     plt.xticks([0, 1], ['0', '1'])
                     format_axes(m_ax)
                     m_fig.tight_layout()
-                    m_fig.savefig(f'figures/unified-{self.dataset_name}-oneshot-{model_arch}-{model_size}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
+                    m_fig.savefig(f'figures/unified-{self.dataset_name}-oneshot-{model_name}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
                     plt.close(m_fig)
 
             gt_distances = np.array([distance_metric(self.real_probs, pred_probs) for pred_probs in all_pred_probs])
@@ -324,9 +320,9 @@ class Plotter:
                 merrs = np.array(merrs)
                 mtridxs = np.array(mtridxs)
                 mtridx = mtridxs[len(mtridxs) // 2]
-                print(f'{self.dataset_name} {model_arch}-{model_size} prompt {pnum} oneshot median distance idx: {mtridx}')
+                print(f'{self.dataset_name} {model_name} prompt {pnum} oneshot median distance idx: {mtridx}')
 
-                shutil.copy2(f'figures/unified-{self.dataset_name}-oneshot-{model_arch}-{model_size}-prompt-{pnum}-trial-{mtridx}.pdf', f'figures/unified-{self.dataset_name}-oneshot-{model_arch}-{model_size}-prompt-{pnum}-trial-median.pdf')
+                shutil.copy2(f'figures/unified-{self.dataset_name}-oneshot-{model_name}-prompt-{pnum}-trial-{mtridx}.pdf', f'figures/unified-{self.dataset_name}-oneshot-{model_name}-prompt-{pnum}-trial-median.pdf')
 
             cross_distances = np.array([distance_metric(all_pred_probs[i], all_pred_probs[j]) for i in range(len(all_pred_probs)) for j in range(i+1, len(all_pred_probs))])
             cross_distances /= self.uniform_cross
@@ -340,7 +336,7 @@ class Plotter:
 
         return y_gt, y_gt_errs, y_cross, y_cross_errs, containment, containment_errs
 
-    def read_autoregressive(self, model_arch, model_size, plot_per_trial, is_raw):
+    def read_autoregressive(self, model_name, plot_per_trial, is_raw):
         y_autoregressive_gt = []
         y_autoregressive_gt_errs = []
         y_autoregressive_cross = []
@@ -360,10 +356,10 @@ class Plotter:
 
             for trial in range(10):
                 try:
-                    with open(f'data/{self.dataset_name}/autoregressive/prompt-{pnum}/{model_arch.lower()}-{model_size}/trial-{trial}/{raw_dash}rollouts.pkl', 'rb') as f:
+                    with open(f'data/{self.dataset_name}/autoregressive/prompt-{pnum}/{model_name.lower()}/trial-{trial}/{raw_dash}rollouts.pkl', 'rb') as f:
                         rollouts = pickle.load(f)
                 except FileNotFoundError:
-                    print('FILE NOT FOUND: {}'.format(f'data/{self.dataset_name}/autoregressive/prompt-{pnum}/{model_arch.lower()}-{model_size}/trial-{trial}/{raw_dash}rollouts.pkl'))
+                    print('FILE NOT FOUND: {}'.format(f'data/{self.dataset_name}/autoregressive/prompt-{pnum}/{model_name}/trial-{trial}/{raw_dash}rollouts.pkl'))
                     rollouts = [['bad'] * 10] * 10
 
                 data = [x for rollout in rollouts for x in rollout]
@@ -383,6 +379,7 @@ class Plotter:
 
                 all_containment.append(len(legal_data) / len(data))
                 if len(legal_data) == 0:
+                    print('No legal data found for {} {} {} {}'.format(self.dataset_name, model_name, pnum, trial))
                     continue
 
                 if 'numbers' in self.dataset_name:
@@ -415,17 +412,17 @@ class Plotter:
                         for i, x in enumerate(np.linspace(.05, .95, 10)):
                             m_ax.plot([x-0.05,x+0.05], [self.real_probs[i], self.real_probs[i]], color='grey', linestyle='--', alpha=0.5)
 
-                    m_ax.set_title(f'{model_arch}-{model_size}, {pnum} Example{plural}, ARS')
+                    m_ax.set_title(f'{model_name}, {pnum} Example{plural}, ARS')
                     m_ax.set_xlabel('Generated Number')
                     m_ax.set_ylabel('Sampling Prob.')
                     m_ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
                     format_axes(m_ax)
                     m_fig.tight_layout()
-                    m_fig.savefig(f'figures/unified-{self.dataset_name}-autoregressive-{model_arch}-{model_size}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
+                    m_fig.savefig(f'figures/unified-{self.dataset_name}-autoregressive-{model_name}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
                     plt.close(m_fig)
                 elif 'bits' in self.dataset_name:
                     m_ax.bar([0, 1], pred_probs, width=0.8)
-                    m_ax.set_title(f'{model_arch}-{model_size}, {pnum} Example{plural}, ARS')
+                    m_ax.set_title(f'{model_name}, {pnum} Example{plural}, ARS')
                     m_ax.set_xlabel('Generated Bit')
                     m_ax.set_ylabel('Sampling Prob.')
                     m_ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
@@ -438,7 +435,7 @@ class Plotter:
                     plt.xticks([0, 1], ['0', '1'])
                     format_axes(m_ax)
                     m_fig.tight_layout()
-                    m_fig.savefig(f'figures/unified-{self.dataset_name}-autoregressive-{model_arch}-{model_size}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
+                    m_fig.savefig(f'figures/unified-{self.dataset_name}-autoregressive-{model_name}-prompt-{pnum}-trial-{trial}.pdf', bbox_inches='tight')
                     plt.close(m_fig)
 
 
@@ -450,10 +447,10 @@ class Plotter:
                 merrs = np.array(merrs)
                 mtridxs = np.array(mtridxs)
                 mtridx = mtridxs[len(mtridxs) // 2]
-                print(f'{self.dataset_name} {model_arch}-{model_size} prompt {pnum} autoregressive median distance idx: {mtridx}')
+                print(f'{self.dataset_name} {model_name} prompt {pnum} autoregressive median distance idx: {mtridx}')
 
-                median_fname = f'figures/unified-{self.dataset_name}-autoregressive-{model_arch}-{model_size}-prompt-{pnum}-trial-median.pdf'
-                shutil.copy2(f'figures/unified-{self.dataset_name}-autoregressive-{model_arch}-{model_size}-prompt-{pnum}-trial-{mtridx}.pdf', median_fname)
+                median_fname = f'figures/unified-{self.dataset_name}-autoregressive-{model_name}-prompt-{pnum}-trial-median.pdf'
+                shutil.copy2(f'figures/unified-{self.dataset_name}-autoregressive-{model_name}-prompt-{pnum}-trial-{mtridx}.pdf', median_fname)
 
             cross_distances = np.array([distance_metric(all_pred_probs[i], all_pred_probs[j]) for i in range(len(all_pred_probs)) for j in range(i+1, len(all_pred_probs))])
             cross_distances /= self.autoregressive_baseline_cross
@@ -478,10 +475,10 @@ class Plotter:
         LS = ['-', '--', ':']
         MARKERS = ['o', 'x', '^']
 
-        for model_idx, (model_arch, model_size) in enumerate(self.models):
+        for model_idx, model_name in enumerate(self.models):
             for lab_i, (label, func) in enumerate(labels_and_funcs):
-                dist, dist_errs, cross, cross_errs, containment, containment_errs = func(model_arch, model_size)
-                plot_label=f'{model_arch}-{model_size}'
+                dist, dist_errs, cross, cross_errs, containment, containment_errs = func(model_name)
+                plot_label=f'{model_name}'
                 if n_columns == 1:
                     ls = LS[lab_i]
                     marker = MARKERS[lab_i]
@@ -598,12 +595,13 @@ def main():
     parser.add_argument('--plot-per-trial', action='store_true', default=False)
     parser.add_argument('--n-columns', type=int, default=2)
     parser.add_argument('--types', nargs='+', default=['NARS', 'ARS'])
+    parser.add_argument('--models', nargs='+')
 
     args = parser.parse_args()
 
     for name in args.domains:
         configuration = next(c for c in configurations if c['name'].lower() == name.lower())
-        plotter = Plotter(configuration)
+        plotter = Plotter(configuration, args.models)
 
         plotters = {
             'NARS': functools.partial(plotter.read_oneshot, plot_per_trial=args.plot_per_trial),

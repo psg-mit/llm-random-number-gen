@@ -176,7 +176,8 @@ model_params = {
     'llama-13B': ('llama', 'models/llama-13B/ggml-model-q8_0.bin', 1000),
     'llama-30B': ('llama', 'models/llama-30B/ggml-model-q8_0.bin', 1000),
     'llama-65B': ('llama', 'models/llama-65B/ggml-model-q8_0.bin', 1000),
-    'gpt2-tiny': ('huggingface', 'models/mgpt2', 0),
+    'llama-7B-huggingface': ('huggingface', 'decapoda-research/llama-7b-hf', 0),
+    'bert-tiny-uncased': ('huggingface', 'google/bert_uncased_L-2_H-128_A-2', 0),
 }
 
 experiments = {
@@ -192,11 +193,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', choices=model_params.keys(), required=True)
     parser.add_argument('--experiment', choices=experiments.keys(), required=True)
-    parser.add_argument('--warmup', type=int, default=0, nargs='+')
+    parser.add_argument('--prompt-examples', type=int, default=0, nargs='+')
     parser.add_argument('--trials', type=int, default=10)
     parser.add_argument('--debug', action='store_true')
 
-    subparsers = parser.add_subparsers(dest='command')
+    subparsers = parser.add_subparsers(dest='command', required=True)
     one_shot_parser = subparsers.add_parser('oneshot')
     autoregressive_parser = subparsers.add_parser('autoregressive')
 
@@ -220,9 +221,9 @@ def main():
     else:
         raise ValueError('unknown runner type {}'.format(runner_type))
 
-    for warmup in tqdm.tqdm(args.warmup):
+    for prompt_examples in tqdm.tqdm(args.prompt_examples):
         for trial in tqdm.trange(args.trials, leave=False):
-            data_dir = os.path.join('data', args.experiment, args.command, 'prompt-{}'.format(warmup), args.model.lower(), 'trial-{}'.format(trial))
+            data_dir = os.path.join('data', args.experiment, args.command, 'prompt-{}'.format(prompt_examples), args.model.lower(), 'trial-{}'.format(trial))
             os.makedirs(data_dir, exist_ok=True)
 
             if args.experiment == 'pcfg':
@@ -240,10 +241,10 @@ def main():
             else:
                 raise ValueError('unknown experiment "{}"'.format(args.experiment))
 
-            synthetic_warmup_samples = pcfg.sample(warmup, seed=trial)
-            for i, sample in enumerate(synthetic_warmup_samples):
+            synthetic_prompt_samples = pcfg.sample(prompt_examples, seed=trial)
+            for i, sample in enumerate(synthetic_prompt_samples):
                 prompt += '{}. {}\n'.format(i + 1, sample)
-            prompt += '{}.'.format(len(synthetic_warmup_samples) + 1)
+            prompt += '{}.'.format(len(synthetic_prompt_samples) + 1)
 
 
             if args.debug:
